@@ -9,6 +9,13 @@
 (ns clj-stripe.util
 	(:require [clj-http.client :as client]))
 
+(defonce ^:dynamic *api-version* nil)
+
+(defmacro with-api-version
+  "Binds the specified Stripe API version to the api-version variable and executes the body."
+  [api-version & body]
+  `(binding [*api-version* ~api-version] ~@body))
+
 (defn keys-2-strings
   "Converts all the keys of a map from keywords to strings."
   [km]
@@ -41,23 +48,31 @@
   (let [params-str (reduce #(append-param %1 %2 (get m %2 nil)) nil param-names)]
     (str url (if params-str (str "?" params-str) ""))))
 
+(defn- add-api-version-header [request]
+  (if *api-version*
+    (assoc request :headers {"Stripe-Version" *api-version*})
+    request))
+
 (defn post-request
   "POSTs a to a url using the provided authentication token and parameters."
   [token url params]
   (try
-    (:body (client/post url {:basic-auth [token] :query-params params :throw-exceptions false :as :json}))
+    (:body (client/post url (-> {:basic-auth [token] :query-params params :throw-exceptions false :as :json}
+                                (add-api-version-header))))
     (catch java.lang.Exception e e)))
 
 (defn get-request
   "Issues a GET request to the specified url, using the provided authentication token and parameters."
   [token url]
   (try
-    (:body (client/get url {:basic-auth [token] :throw-exceptions false :as :json}))
+    (:body (client/get url (-> {:basic-auth [token] :throw-exceptions false :as :json}
+                               (add-api-version-header))))
     (catch java.lang.Exception e e)))
 
 (defn delete-request
   "Issues a DELETE request to the specified url, using the provided authentication token and parameters."
   [token url]
   (try
-    (:body (client/delete url {:basic-auth [token] :throw-exceptions false :as :json}))
+    (:body (client/delete url (-> {:basic-auth [token] :throw-exceptions false :as :json}
+                                  (add-api-version-header))))
     (catch java.lang.Exception e e)))
